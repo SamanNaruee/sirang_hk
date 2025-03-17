@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from .models import Farmer, Product, Order
 from rest_framework import status
+from .serializers import ProductSerializer, FarmerSerializer, OrderSerializer
 import requests
 
 
@@ -49,7 +50,7 @@ class GetHamrahTokenView(APIView):
         return Response(data, status=status.HTTP_200_OK)  
 
 
-class FarmerInfoView(APIView):
+class FarmerUserInfoView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -115,3 +116,28 @@ class OrderCreateView(APIView):
             Order.objects.create(order_id=data["order_id"], redirect_url=data["redirect_url"], status="ON_PROCESSING")
             return Response(data, status=201)
         return Response({"error": "Failed to create order"}, status=response.status_code)
+
+
+class ProductsView(APIView):
+    permision_classes = [AllowAny]
+    serializer_class = ProductSerializer
+
+    def get(self, request):
+        products = Product.objects.all()
+        return Response(products, status=200)
+    
+    def post(self, request):
+        product = Product.objects.create(name=request.data.get("name"), price=request.data.get("price"))
+        return Response(product, status=201)
+
+class ProductDeleteView(APIView):
+    permision_classes = [AllowAny]
+
+    def get(self, request, product_id):
+        product = Product.objects.filter(id=product_id).first()
+        return Response(product, status=200)
+
+    def delete(self, request, product_id):
+        product = Product.objects.filter(id=product_id).delete()
+        return Response(product, status=200)
+
