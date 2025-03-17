@@ -156,8 +156,10 @@ class OrderStatusView(APIView):
 
     def get(self, request, order_id=None):
         if order_id:
-            order = Order.objects.filter(order_id=order_id).first()
-            if not order:
+            try:
+                order = Order.objects.get(order_id=order_id)
+            
+            except Order.DoesNotExist:
                 return Response({"error": "Order not found"}, status=404)
 
             headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
@@ -171,8 +173,31 @@ class OrderStatusView(APIView):
                 return Response(data, status=200)
             return Response({"error": "Failed to fetch order status"}, status=response.status_code)
         
-        orders = Order.objects.all().values("order_id", "status")
-        return Response(list(orders), status=200)
+        orders = Order.objects.all()
+        orders = OrderSerializer(orders, many=True)
+        return Response(orders.data, status=200)
 
 
+class OrderConfirmView(APIView):
+    permission_classes = [AllowAny]
 
+    def get(self, request, order_id=None):
+        if order_id:
+            try:
+                order = Order.objects.get(order_id=order_id)
+            except Order.DoesNotExist:
+                return Response({"error": "Order not found"}, status=404)
+
+            headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+            url = f"https://core.hamrahkeshavarz.ir/api/third-party/orders/{order_id}/confirm"
+            response = requests.patch(url, headers=headers, timeout=10)
+
+            if response.status_code == 204:
+                data = response.json()
+                order.status = "CONFIRMED"
+                order.save()
+                return Response(data, status=200)
+            return Response({"error": "Failed to confirm order"}, status=response.status_code)
+        orders = Order.objects.all()
+        orders = OrderSerializer(orders, many=True)
+        return Response(orders.data, status=200)
