@@ -7,34 +7,44 @@ from rest_framework import status
 import requests
 
 
-class GetHamrahTokenView(APIView):
-    permission_classes = [IsAuthenticated]
+class GetHamrahTokenView(APIView):  
+    permission_classes = [IsAuthenticated]  
 
-    def post(self, request):
-        farmer_key = settings.FARMER_KEY 
-        auth_token = settings.HAMRAH_AUTH_TOKEN 
+    def post(self, request):  
+        farmer_key = settings.FARMER_KEY   
+        auth_token = settings.HAMRAH_AUTH_TOKEN   
 
-        if not farmer_key or not auth_token:
-            return Response({"error": "Missing credentials"}, status=status.HTTP_400_BAD_REQUEST)
+        if not farmer_key or not auth_token:  
+            return Response({"error": "Missing credentials"}, status=status.HTTP_400_BAD_REQUEST)  
 
-        import requests
+        headers = {  
+            "Authorization": f"Bearer {auth_token}",  
+            "Content-Type": "application/json"  
+        }  
+        data = {"farmer_key": str(farmer_key)}  
+        response = requests.post("https://core.hamrahkeshavarz.ir/api/third-party/token", json=data, headers=headers)  
 
-        headers = {
-            "Authorization": f"Bearer {auth_token}",
-            "Content-Type": "application/json"
-        }
-        data = {"farmer_key": str(farmer_key)}
-        response = requests.post("https://core.hamrahkeshavarz.ir/api/third-party/token", json=data, headers=headers)
-        if response.status_code != 200:
-            return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
-        farmer, created = Farmer.objects.update_or_create(
-            farmer_key=farmer_key, token=response.data['token'] # Fix this TODO
-        )
-        data = {}
-        data["farmer"] = farmer.__dict__ if created else 'None'
-        data["response"] = response.json()
+        if response.status_code != 200:  
+            return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)  
 
-        return Response(data, status=status.HTTP_200_OK)
+        response_data = response.json()
+        token = response_data.get('token')
+
+        if not token:  
+            return Response({"error": "Token not found in response"}, status=status.HTTP_400_BAD_REQUEST)  
+
+        # Update or create the Farmer object  
+        farmer, created = Farmer.objects.update_or_create(  
+            farmer_key=farmer_key,  
+            defaults={'token': token}
+        )  
+
+        data = {  
+            "farmer": farmer.__dict__ if created else 'None',  
+            "response": response_data  
+        }  
+
+        return Response(data, status=status.HTTP_200_OK)  
 
 
 class FarmerInfoView(APIView):

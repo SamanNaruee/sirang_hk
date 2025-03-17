@@ -130,5 +130,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Static values:
 from decouple import config
-HAMRAH_AUTH_TOKEN = config('HAMRAH_AUTH_TOKEN', cast=str)
-FARMER_KEY = config('FARMER_KEY', cast=str)
+HAMRAH_AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5MzIzNzIzLCJpYXQiOjE3Mzc3ODc3MjMsImp0aSI6ImU5MTJiODcwYTdkZDQ2ZGFhMWViM2U3MTZiNmMzODJlIiwiaXNfc2lyYW5nIjp0cnVlfQ.Ou5-qJBpZQ7K5Fh4RZ2o67mRn7B9YWURMG_AD3Gwzug"
+FARMER_KEY = 
