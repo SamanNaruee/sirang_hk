@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import GetHamrahTokenView, FarmerUserInfoView, VendorItemsView, OrderCreateView, ProductsView ,OrderStatusView\
-, OrderConfirmView
+, OrderConfirmView, OrderCancelView
 
 urlpatterns = [
     path('get-token/', GetHamrahTokenView.as_view(), name='get-hamrah-token'),
@@ -11,7 +11,9 @@ urlpatterns = [
     path('order-status/<uuid:order_id>/', OrderStatusView.as_view(), name='order-status-detail'),
     path('order-confirm/', OrderConfirmView.as_view(), name='orders-for-confirm'),
     path('order-confirm/<uuid:order_id>/', OrderConfirmView.as_view(), name='order-confirm-detail'),
-    
+    path('order-cancel/', OrderCancelView.as_view(), name='orders-for-cancel'),
+    path('order-cancel/<uuid:order_id>/', OrderCancelView.as_view(), name='order-cancel-detail'),
+
 
     # Products
     path('products/', ProductsView.as_view(), name='products'),
