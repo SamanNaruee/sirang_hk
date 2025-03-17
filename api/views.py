@@ -23,7 +23,7 @@ class GetHamrahTokenView(APIView):
             "Content-Type": "application/json"  
         }  
         data = {"farmer_key": str(farmer_key)}  
-        response = requests.post("https://core.hamrahkeshavarz.ir/api/third-party/token", json=data, headers=headers)  
+        response = requests.post("https://core.hamrahkeshavarz.ir/api/third-party/token", json=data, headers=headers, timeout=10)  
 
         if response.status_code != 200:  
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)  
@@ -54,7 +54,7 @@ class FarmerUserInfoView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        farmer = Farmer.objects.last()
+        farmer = Farmer.objects.order_by('-created_at').first()
         if not farmer:
             return Response({"error": "Farmer token not found"}, status=400)
 
@@ -62,7 +62,7 @@ class FarmerUserInfoView(APIView):
             "Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}",  
         }  
         url = "https://core.hamrahkeshavarz.ir/api/third-party/farmer-info/"
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=10)
 
         if response.status_code == 200:
             return Response(response.json(), status=response.status_code)
@@ -77,13 +77,13 @@ class VendorItemsView(APIView):
         if not items:
             return Response({"error": "Enter valid data."}, status=400)
         
-        farmer = Farmer.objects.last()
+        farmer = Farmer.objects.order_by('-created_at').first()
         if not farmer or not farmer.token or not farmer.farmer_key:
             return Response({"error": "Farmer key not found"}, status=400)
 
         headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
         url = "https://core.hamrahkeshavarz.ir/api/third-party/vendor/items"
-        response = requests.post(url, headers=headers, json=request.data)
+        response = requests.post(url, headers=headers, json=request.data, timeout=10)
 
         if response.status_code == 201:
             for item in request.data.get("items", []):
@@ -96,7 +96,7 @@ class OrderCreateView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        farmer = Farmer.objects.last()
+        farmer = Farmer.objects.order_by('-created_at').first()
         if not farmer or not farmer.token or not farmer.farmer_key:
             return Response({"error": "Farmer key not found"}, status=400)
         # request.data['items'] validation:
@@ -109,7 +109,7 @@ class OrderCreateView(APIView):
             
         headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
         url = "https://core.hamrahkeshavarz.ir/api/third-party/orders"
-        response = requests.post(url, headers=headers, json=request.data)
+        response = requests.post(url, headers=headers, json=request.data, timeout=10)
 
         if response.status_code == 201:
             data = response.json()
@@ -117,27 +117,62 @@ class OrderCreateView(APIView):
             return Response(data, status=201)
         return Response({"error": "Failed to create order"}, status=response.status_code)
 
+class ProductsView(APIView):  
+    permission_classes = [AllowAny] 
 
-class ProductsView(APIView):
-    permision_classes = [AllowAny]
-    serializer_class = ProductSerializer
-
-    def get(self, request):
-        products = Product.objects.all()
-        return Response(products, status=200)
+    def get(self, request):  
+        products = Product.objects.all()  
+        serializer = ProductSerializer(products, many=True)
+        return Response(serializer.data, status=200)  
     
-    def post(self, request):
-        product = Product.objects.create(name=request.data.get("name"), price=request.data.get("price"))
-        return Response(product, status=201)
+    def post(self, request):  
+        serializer = ProductSerializer(data=request.data) 
+        if serializer.is_valid(raise_exception=True):  
+            product = serializer.save()
+            return Response(ProductSerializer(product).data, status=201) 
 
-class ProductDeleteView(APIView):
-    permision_classes = [AllowAny]
+class ProductDeleteView(APIView):  
+    permission_classes = [AllowAny]
 
-    def get(self, request, product_id):
-        product = Product.objects.filter(id=product_id).first()
-        return Response(product, status=200)
+    def get(self, request, product_id):  
+        try:
+            product = Product.objects.get(id=product_id)
+            serializer = ProductSerializer(product)
+            return Response(serializer.data, status=200)
+        except Product.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
 
-    def delete(self, request, product_id):
-        product = Product.objects.filter(id=product_id).delete()
-        return Response(product, status=200)
+    def delete(self, request, product_id):  
+        try:
+            product = Product.objects.get(id=product_id)
+            product.delete()
+            return Response({"detail": "Deleted successfully."}, status=204)
+        except Product.DoesNotExist:
+            return Response({"detail": "Not found."}, status=404)
+
+
+class OrderStatusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, order_id=None):
+        if order_id:
+            order = Order.objects.filter(order_id=order_id).first()
+            if not order:
+                return Response({"error": "Order not found"}, status=404)
+
+            headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+            url = f"https://core.hamrahkeshavarz.ir/api/third-party/orders/{order_id}"
+            response = requests.get(url, headers=headers, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                order.status = data["status"]
+                order.save()
+                return Response(data, status=200)
+            return Response({"error": "Failed to fetch order status"}, status=response.status_code)
+        
+        orders = Order.objects.all().values("order_id", "status")
+        return Response(list(orders), status=200)
+
+
 
