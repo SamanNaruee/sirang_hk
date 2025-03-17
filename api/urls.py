@@ -7,5 +7,5 @@ urlpatterns = [
     path('create-or-update-items/', VendorItemsView.as_view(), name='vendor-items'),
     path('create-order/', OrderCreateView.as_view(), name='create-order'),
     path('products/', ProductsView.as_view(), name='products'),
-    path('products/<int:product_id>/', ProductsView.as_view(), name='product-detail'),
+    path('products/<int:product_id>/', ProductsView.as_view(), name='product-detail'), 
 ]
