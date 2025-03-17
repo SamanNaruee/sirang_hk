@@ -8,7 +8,7 @@ import requests
 
 
 class GetHamrahTokenView(APIView):  
-    permission_classes = [IsAuthenticated]  
+    permission_classes = [AllowAny]  
 
     def post(self, request):  
         farmer_key = settings.FARMER_KEY   
@@ -31,7 +31,9 @@ class GetHamrahTokenView(APIView):
         token = response_data.get('token')
 
         if not token:  
-            return Response({"error": "Token not found in response"}, status=status.HTTP_400_BAD_REQUEST)  
+            return Response({"error": "Token not found in response"}, status=status.HTTP_400_BAD_REQUEST)
+
+        settings.HALF_HOUR_LIFETIME_TOKEN = token  
 
         # Update or create the Farmer object  
         farmer, created = Farmer.objects.update_or_create(  
@@ -55,11 +57,13 @@ class FarmerInfoView(APIView):
         if not farmer:
             return Response({"error": "Farmer token not found"}, status=400)
 
-        headers = {"Authorization": f"Bearer {farmer.token}"}
+        headers = {  
+            "Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}",  
+        }  
         url = "https://core.hamrahkeshavarz.ir/api/third-party/farmer-info/"
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
             return Response(response.json(), status=response.status_code)
-        return Response({"error": "Failed to fetch farmer info"}, status=response.status_code)
+        return Response({"error": "Failed to fetch farmer info, may you must refresh farmer_key and half_hour_token... ."}, status=response.status_code)
 
