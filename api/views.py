@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from .models import Farmer, Product
+from .models import Farmer, Product, Order
 from rest_framework import status
 import requests
 
@@ -89,3 +89,29 @@ class VendorItemsView(APIView):
                 Product.objects.update_or_create(id=item["id"], defaults={"name": item["name"], "price": item["price"]})
             return Response(response.json(), status=201)
         return Response({"error": "Failed to update items"}, status=response.status_code)
+
+
+class OrderCreateView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        farmer = Farmer.objects.last()
+        if not farmer or not farmer.token or not farmer.farmer_key:
+            return Response({"error": "Farmer key not found"}, status=400)
+        # request.data['items'] validation:
+        items = request.data.get("items", [])
+        if not items:
+            return Response({"error": "Enter valid data."}, status=400)
+        for item in items:
+            if not item or not item['count'] or item['count'] <= 0:
+                return Response({"error": "Enter valid data. it must be a list of dict with count > 0"}, status=400)
+            
+        headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+        url = "https://core.hamrahkeshavarz.ir/api/third-party/orders"
+        response = requests.post(url, headers=headers, json=request.data)
+
+        if response.status_code == 201:
+            data = response.json()
+            Order.objects.create(order_id=data["order_id"], redirect_url=data["redirect_url"], status="ON_PROCESSING")
+            return Response(data, status=201)
+        return Response({"error": "Failed to create order"}, status=response.status_code)
