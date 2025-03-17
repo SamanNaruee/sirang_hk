@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from .models import Farmer, Product, Order
+from .models import Farmer, Product, Order, HalfHourToken
 from rest_framework import status
 from .serializers import ProductSerializer, FarmerSerializer, OrderSerializer
 import requests
@@ -34,7 +34,11 @@ class GetHamrahTokenView(APIView):
         if not token:  
             return Response({"error": "Token not found in response"}, status=status.HTTP_400_BAD_REQUEST)
 
-        settings.HALF_HOUR_LIFETIME_TOKEN = token  
+
+        # Update or create the HalfHourToken object
+        HalfHourToken.objects.update_or_create(
+            token=token
+        )
 
         # Update or create the Farmer object  
         farmer, created = Farmer.objects.update_or_create(  
@@ -58,8 +62,9 @@ class FarmerUserInfoView(APIView):
         if not farmer:
             return Response({"error": "Farmer token not found"}, status=400)
 
+        HFT = HalfHourToken.objects.filter('-created_at').first()
         headers = {  
-            "Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}",  
+            "Authorization": f"Bearer {HFT.token}",  
         }  
         url = "https://core.hamrahkeshavarz.ir/api/third-party/farmer-info/"
         response = requests.get(url, headers=headers, timeout=10)
@@ -81,7 +86,8 @@ class VendorItemsView(APIView):
         if not farmer or not farmer.token or not farmer.farmer_key:
             return Response({"error": "Farmer key not found"}, status=400)
 
-        headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+        HFT = HalfHourToken.objects.filter('-created_at').first()
+        headers = {"Authorization": f"Bearer {HFT.token}"}
         url = "https://core.hamrahkeshavarz.ir/api/third-party/vendor/items"
         response = requests.post(url, headers=headers, json=request.data, timeout=10)
 
@@ -106,8 +112,9 @@ class OrderCreateView(APIView):
         for item in items:
             if not item or not item['count'] or item['count'] <= 0:
                 return Response({"error": "Enter valid data. it must be a list of dict with count > 0"}, status=400)
-            
-        headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+        
+        HFT = HalfHourToken.objects.filter('-created_at').first()
+        headers = {"Authorization": f"Bearer {HFT.token}"}
         url = "https://core.hamrahkeshavarz.ir/api/third-party/orders"
         response = requests.post(url, headers=headers, json=request.data, timeout=10)
 
@@ -161,8 +168,8 @@ class OrderStatusView(APIView):
             
             except Order.DoesNotExist:
                 return Response({"error": "Order not found"}, status=404)
-
-            headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+            HFT = HalfHourToken.objects.filter('-created_at').first()
+            headers = {"Authorization": f"Bearer {HFT.token}"}
             url = f"https://core.hamrahkeshavarz.ir/api/third-party/orders/{order_id}"
             response = requests.get(url, headers=headers, timeout=10)
 
@@ -187,8 +194,10 @@ class OrderConfirmView(APIView):
                 order = Order.objects.get(order_id=order_id)
             except Order.DoesNotExist:
                 return Response({"error": "Order not found"}, status=404)
+            
 
-            headers = {"Authorization": f"Bearer {settings.HALF_HOUR_LIFETIME_TOKEN}"}
+            HFT = HalfHourToken.objects.filter('-created_at').first()
+            headers = {"Authorization": f"Bearer {HFT.token}"}
             url = f"https://core.hamrahkeshavarz.ir/api/third-party/orders/{order_id}/confirm"
             response = requests.patch(url, headers=headers, timeout=10)
 
@@ -201,3 +210,5 @@ class OrderConfirmView(APIView):
         orders = Order.objects.all()
         orders = OrderSerializer(orders, many=True)
         return Response(orders.data, status=200)
+
+

@@ -16,3 +16,7 @@ class Order(models.Model):
     status = models.CharField(max_length=50)
     redirect_url = models.URLField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+class HalfHourToken(models.Model):
+    token = models.CharField(max_length=1024, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
