@@ -1,9 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from .models import Farmer
 from rest_framework import status
+import requests
+
 
 class GetHamrahTokenView(APIView):
     permission_classes = [IsAuthenticated]
@@ -26,7 +28,7 @@ class GetHamrahTokenView(APIView):
         if response.status_code != 200:
             return Response(response.json(), status=status.HTTP_400_BAD_REQUEST)
         farmer, created = Farmer.objects.update_or_create(
-            farmer_key=farmer_key, token=auth_token
+            farmer_key=farmer_key, token=response.data['token'] # Fix this TODO
         )
         data = {}
         data["farmer"] = farmer.__dict__ if created else 'None'
@@ -34,4 +36,20 @@ class GetHamrahTokenView(APIView):
 
         return Response(data, status=status.HTTP_200_OK)
 
+
+class FarmerInfoView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        farmer = Farmer.objects.last()
+        if not farmer:
+            return Response({"error": "Farmer token not found"}, status=400)
+
+        headers = {"Authorization": f"Bearer {farmer.token}"}
+        url = "https://core.hamrahkeshavarz.ir/api/third-party/farmer-info/"
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            return Response(response.json(), status=response.status_code)
+        return Response({"error": "Failed to fetch farmer info"}, status=response.status_code)
 
